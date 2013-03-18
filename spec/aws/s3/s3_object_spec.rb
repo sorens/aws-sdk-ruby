@@ -836,6 +836,11 @@ module AWS
 
         let(:http_request) { Request.new }
 
+        let(:method) { :put }
+        let(:content_type) { 'image/png' }
+        let(:expires) {3600}
+        let(:resource) { "/foo/bar" }
+
         let(:credential_provider) {
           Core::CredentialProviders::StaticProvider.new({
             :access_key_id => "ACCESS_KEY",
@@ -844,7 +849,7 @@ module AWS
         }
 
         before(:each) do
-          http_request.stub(:canonicalized_resource).and_return("/foo/bar")
+          http_request.stub(:canonicalized_resource).and_return(resource)
           config.stub(:credential_provider).and_return(credential_provider)
           Request.stub(:new).and_return(http_request)
         end
@@ -883,6 +888,30 @@ module AWS
           http_request.should_receive(:add_param).
             with('versionId', 'version-id-string')
           object.url_for(:read, :version_id => 'version-id-string')
+        end
+
+        it 'should include the content_type in the signature' do
+          calculated_expires = (Time.now + expires).to_i
+          parts = []
+          parts << method.to_s.upcase
+          parts << ""
+          parts << content_type
+          parts << calculated_expires
+          parts << resource
+          signature = CGI.escape(Core::Signer.sign(config.credential_provider.secret_access_key, parts.join("\n"), 'sha1'))
+          object.url_for( method, { :content_type => content_type, :expires => expires } ).to_s.include?( "Signature=#{signature}" ).should be_true
+        end
+
+        it 'should not include a content_type in the signature' do
+          calculated_expires = (Time.now + expires).to_i
+          parts = []
+          parts << method.to_s.upcase
+          parts << ""
+          parts << ""
+          parts << calculated_expires
+          parts << resource
+          signature = CGI.escape( Core::Signer.sign(config.credential_provider.secret_access_key, parts.join("\n"), 'sha1') )
+          object.url_for( method, { :expires => expires } ).to_s.include?( "Signature=#{signature}" ).should be_true
         end
 
         context 'federated sessions' do

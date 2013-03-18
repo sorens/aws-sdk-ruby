@@ -1173,6 +1173,9 @@ module AWS
       #   whether the generated URL should place the bucket name in
       #   the path (true) or as a subdomain (false).
       #
+      # @option options [String] :content_type (nil) Include the 
+      #   content_type in the signature
+      #
       # @option options [String] :response_content_type Sets the
       #   Content-Type header of the response when performing an
       #   HTTP GET on the returned URL.
@@ -1208,7 +1211,7 @@ module AWS
         req.add_param("AWSAccessKeyId",
                       config.credential_provider.access_key_id)
         req.add_param("versionId", options[:version_id]) if options[:version_id]
-        req.add_param("Signature", signature(method, expires, req))
+        req.add_param("Signature", signature(method, expires, req, options[:content_type]))
         req.add_param("Expires", expires)
         req.add_param("x-amz-security-token",
                       config.credential_provider.session_token) if
@@ -1337,12 +1340,11 @@ module AWS
                         :query => request.querystring)
       end
 
-      def signature(method, expires, request)
-
+      def signature(method, expires, request, content_type=nil)
         parts = []
         parts << method
         parts << ""
-        parts << ""
+        parts << (content_type.nil? ? "" : content_type)
         parts << expires
         if token = config.credential_provider.session_token
           parts << "x-amz-security-token:#{token}"
